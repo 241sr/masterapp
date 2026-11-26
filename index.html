@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sree Finance Super App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    .card-dark { background-color: #161821; }
+    .card-darker { background-color: #1c1f2b; }
+    .credit-card-bg { background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #1e1b4b 100%); }
+    .debit-card-bg  { background: linear-gradient(135deg, #064e3b 0%, #0f172a 65%, #111827 100%); }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #000000; }
+    ::-webkit-scrollbar-thumb { background: #2d3142; border-radius: 2px; }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center bg-black">
+
+<div class="w-full max-w-md min-h-screen bg-black flex flex-col relative pb-24 select-none">
+
+  <!-- ==================== UNIFIED LOCK SCREEN ==================== -->
+  <div id="authScreen" class="fixed inset-0 max-w-md mx-auto bg-black z-50 flex flex-col justify-center p-6">
+    <div class="card-dark rounded-2xl p-6 border border-slate-800 shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center mb-4 mx-auto">🔒</div>
+      <h2 class="text-xl font-bold text-center text-white mb-1">Sree Finance Locked</h2>
+      <p class="text-xs text-slate-400 text-center mb-6">Unlock Ledger, Vault & Notes</p>
+
+      <div class="grid grid-cols-2 gap-2 p-1 bg-black rounded-xl mb-5 border border-slate-800">
+        <button type="button" onclick="switchAuthTab('password')" id="tabPassBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white">Password</button>
+        <button type="button" onclick="switchAuthTab('otp')" id="tabOtpBtn" class="py-2 text-xs font-semibold rounded-lg text-slate-400">Email OTP</button>
+      </div>
+
+      <form id="passwordAuthForm" onsubmit="loginWithPassword(event)" class="space-y-3">
+        <input type="text" id="loginUser" required placeholder="Username" class="w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-sm text-white focus:outline-none focus:border-blue-500">
+        <input type="password" id="loginPass" required placeholder="Password / PIN" class="w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-sm text-white focus:outline-none focus:border-blue-500">
+        <button type="submit" id="loginPassBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-sm">Unlock</button>
+      </form>
+
+      <div id="otpAuthForm" class="hidden space-y-3">
+        <button type="button" onclick="requestEmailOtp()" id="sendOtpBtn" class="w-full py-2.5 bg-slate-800 text-blue-400 border border-slate-700 font-medium rounded-xl text-xs">Send 6-Digit OTP to Email</button>
+        <input type="number" id="loginOtpInput" placeholder="Enter 6-digit OTP" class="w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-center tracking-widest text-base font-bold text-white focus:outline-none focus:border-blue-500">
+        <button type="button" onclick="verifyEmailOtp()" id="verifyOtpBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-sm">Verify & Unlock</button>
+      </div>
+      <p id="authErrorMsg" class="text-xs text-rose-400 text-center mt-4 hidden"></p>
+    </div>
+  </div>
+
+  <!-- ==================== TOP GLOBAL HEADER ==================== -->
+  <div class="flex justify-between items-center px-4 pt-4 pb-2">
+    <div>
+      <h1 id="headerTitle" class="text-xl font-semibold text-white tracking-wide">Expenses</h1>
+      <p id="syncStatus" class="text-[11px] text-slate-400">Loading...</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="headerActionBtn" onclick="openChartModal()" class="px-3 py-1.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 hover:text-white">📊 Chart</button>
+      <button onclick="syncAllData(true)" id="syncBtn" title="Sync Now" class="w-8 h-8 rounded-xl card-dark border border-slate-800 flex items-center justify-center text-xs text-slate-300">🔄</button>
+      <button onclick="logoutApp()" title="Lock App" class="w-8 h-8 rounded-xl card-dark border border-slate-800 flex items-center justify-center text-xs text-slate-300 hover:text-rose-400">🔒</button>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 1: EXPENSES ==================== -->
+  <div id="tabExpenses" class="flex-1 flex flex-col px-4 pt-2">
+    <div class="card-dark rounded-2xl p-4 border border-slate-800/80 mb-4">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-xs text-slate-400 uppercase font-medium">Total Personal Expenses</span>
+        <span class="w-6 h-6 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center text-xs font-bold">₹</span>
+      </div>
+      <p id="totalExpenseAmount" class="text-2xl font-bold text-rose-500">₹0.00</p>
+    </div>
+
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-white">Transactions</h2>
+        <button id="clearDateFilter" onclick="resetDateFilter()" class="hidden text-[10px] bg-blue-600/30 text-blue-400 px-2 py-0.5 rounded-full">Clear date ✕</button>
+      </div>
+      <select id="filterCategory" onchange="renderExpenses()" class="card-dark text-xs text-slate-300 border border-slate-800 rounded-lg px-2.5 py-1.5">
+        <option value="ALL">All Categories</option>
+        <option value="Food & Dining">Food & Dining</option>
+        <option value="Groceries">Groceries</option>
+        <option value="Transport">Transport</option>
+        <option value="Bills & Utilities">Bills & Utilities</option>
+        <option value="Shopping">Shopping</option>
+        <option value="Others">Others</option>
+      </select>
+    </div>
+    <div id="expenseList" class="space-y-3 flex-1"></div>
+  </div>
+
+  <!-- ==================== TAB 2: CREDIT CARDS ==================== -->
+  <div id="tabCards" class="hidden flex-1 flex flex-col px-4 pt-2">
+    <div id="manageCardDrawer" class="hidden card-dark rounded-2xl p-4 mb-4 border border-slate-800 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-bold text-white">Add / Update Card</h3>
+        <button onclick="toggleCardDrawer()" class="text-slate-400 text-lg">&times;</button>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-slate-300 bg-black/40 p-2.5 rounded-xl border border-slate-800 cursor-pointer">
+        <input type="checkbox" id="isSharedLimit" class="w-4 h-4 accent-blue-500"> Shared Bank Limit Pool
+      </label>
+      <form id="addCardForm" class="space-y-2.5">
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="newBankName" placeholder="Bank (e.g. HDFC)" required class="px-3 py-2 rounded-xl bg-black border border-slate-800 text-xs text-white">
+          <input type="text" id="newCardName" placeholder="Variant (e.g. Swiggy)" required class="px-3 py-2 rounded-xl bg-black border border-slate-800 text-xs text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input type="number" id="newCardLimit" placeholder="Limit (₹)" required class="px-3 py-2 rounded-xl bg-black border border-slate-800 text-xs text-white">
+          <input type="number" id="newCardDue" min="1" max="31" placeholder="Due Day (1-31)" required class="px-3 py-2 rounded-xl bg-black border border-slate-800 text-xs text-white">
+        </div>
+        <button type="submit" class="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl text-xs">+ Save Card</button>
+      </form>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="card-dark rounded-2xl p-3.5 border border-slate-800/80">
+        <span class="text-[11px] text-slate-400">Total Card Owed</span>
+        <p id="totalOwedBanner" class="text-base font-bold text-rose-400 mt-1">₹0.00</p>
+      </div>
+      <div class="card-dark rounded-2xl p-3.5 border border-slate-800/80">
+        <span class="text-[11px] text-slate-400">Total Available</span>
+        <p id="totalAvailBanner" class="text-base font-bold text-emerald-400 mt-1">₹0.00</p>
+      </div>
+    </div>
+
+    <div id="cardFilterBanner" class="hidden card-darker border border-blue-500/40 px-3.5 py-2 rounded-xl mb-3 flex justify-between items-center text-xs">
+      <span id="cardFilterText" class="text-blue-300"></span>
+      <button onclick="setCardFilter(null)" class="text-blue-400 font-semibold underline">Show Cards</button>
+    </div>
+
+    <div id="cardsContainer" class="space-y-3"></div>
+    <div id="cardTxContainer" class="hidden space-y-2.5"></div>
+  </div>
+
+  <!-- ==================== TAB 3: DAYBOOK ==================== -->
+  <div id="tabDaybook" class="hidden flex-1 flex flex-col px-4 pt-2">
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="card-dark rounded-2xl p-3.5 border border-slate-800/80">
+        <span class="text-[11px] text-slate-400">To Be Received ↙</span>
+        <p id="totalToReceive" class="text-base font-bold text-emerald-400 mt-1">₹0.00</p>
+      </div>
+      <div class="card-dark rounded-2xl p-3.5 border border-slate-800/80">
+        <span class="text-[11px] text-slate-400">To Be Paid ↗</span>
+        <p id="totalToPay" class="text-base font-bold text-rose-400 mt-1">₹0.00</p>
+      </div>
+    </div>
+    <input type="text" id="contactSearchInput" oninput="renderDaybook()" placeholder="Search contact..." class="w-full px-3.5 py-2.5 mb-3 rounded-xl card-dark border border-slate-800 text-xs text-white">
+    <div id="contactsList" class="space-y-2.5"></div>
+  </div>
+
+  <!-- ==================== TAB 4: VAULT (CARDS & BANKS) ==================== -->
+  <div id="tabVault" class="hidden flex-1 flex flex-col px-4 pt-2">
+    <div class="flex gap-1.5 mb-3 overflow-x-auto pb-1">
+      <button onclick="setVaultFilter('ALL')" id="vf_ALL" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white shrink-0">All</button>
+      <button onclick="setVaultFilter('ME')" id="vf_ME" class="px-3 py-1.5 rounded-full text-xs font-semibold card-dark text-slate-400 border border-slate-800 shrink-0">My Cards</button>
+      <button onclick="setVaultFilter('FRIENDS')" id="vf_FRIENDS" class="px-3 py-1.5 rounded-full text-xs font-semibold card-dark text-slate-400 border border-slate-800 shrink-0">Friends</button>
+      <button onclick="setVaultFilter('BANK')" id="vf_BANK" class="px-3 py-1.5 rounded-full text-xs font-semibold card-dark text-slate-400 border border-slate-800 shrink-0">Banks</button>
+    </div>
+    <div id="vaultList" class="space-y-3.5"></div>
+  </div>
+
+  <!-- ==================== TAB 5: PERSONAL NOTES ==================== -->
+  <div id="tabNotes" class="hidden flex-1 flex flex-col px-4 pt-2">
+    <input type="text" id="noteSearchInput" oninput="renderNotes()" placeholder="Search notes..." class="w-full px-3.5 py-2.5 mb-3 rounded-xl card-dark border border-slate-800 text-xs text-white">
+    <div id="notesList" class="space-y-3"></div>
+  </div>
+
+  <!-- ==================== CONTEXT-AWARE FLOATING + BUTTON ==================== -->
+  <button onclick="handleFloatingPlus()" class="fixed bottom-20 right-5 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-xl z-20 transition transform active:scale-95">
+    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4"/></svg>
+  </button>
+
+  <!-- ==================== 5-TAB BOTTOM NAV ==================== -->
+  <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto h-16 card-dark border-t border-slate-800 flex justify-around items-center z-20 px-1">
+    <button onclick="switchMainTab('expenses')" id="navExpenses" class="flex flex-col items-center gap-0.5 text-blue-400"><span class="text-base">💸</span><span class="text-[10px] font-medium">Expenses</span></button>
+    <button onclick="switchMainTab('cards')" id="navCards" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">💳</span><span class="text-[10px] font-medium">Cards</span></button>
+    <button onclick="switchMainTab('daybook')" id="navDaybook" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">📒</span><span class="text-[10px] font-medium">Daybook</span></button>
+    <button onclick="switchMainTab('vault')" id="navVault" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">🔐</span><span class="text-[10px] font-medium">Vault</span></button>
+    <button onclick="switchMainTab('notes')" id="navNotes" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">📝</span><span class="text-[10px] font-medium">Notes</span></button>
+  </div>
+
+  <!-- ==================== PERSON CHAT LEDGER MODAL ==================== -->
+  <div id="personLedgerScreen" class="fixed inset-0 max-w-md mx-auto bg-black z-30 hidden flex-col">
+    <div class="h-14 px-4 border-b border-slate-800 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <button onclick="closePersonLedger()" class="text-slate-300 text-xl">←</button>
+        <h3 id="ledgerPersonName" class="font-semibold text-base text-white">Person</h3>
+      </div>
+      <button onclick="openUniversalModal('FRIEND_PAID', activePerson)" class="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-semibold text-white">+ Entry</button>
+    </div>
+    <div id="chatBubblesContainer" class="flex-1 overflow-y-auto p-4 space-y-3 pb-20"></div>
+    <div class="fixed bottom-4 left-0 right-0 max-w-md mx-auto flex justify-center pointer-events-none">
+      <div id="personNetPill" class="px-5 py-2 rounded-full bg-slate-700/90 text-white text-xs font-semibold shadow-lg"></div>
+    </div>
+  </div>
+
+  <!-- ==================== UNIVERSAL FINANCE ENTRY MODAL ==================== -->
+  <div id="universalModal" class="fixed inset-0 max-w-md mx-auto bg-black/80 backdrop-blur-sm z-40 hidden items-end sm:items-center justify-center p-4">
+    <div class="card-dark w-full p-5 rounded-2xl border border-slate-800 space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+        <h3 class="text-base font-bold text-white">New Connected Entry</h3>
+        <button onclick="closeUniversalModal()" class="text-slate-400 text-2xl">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-1.5">
+        <button type="button" onclick="setEntryMode('EXPENSE')" id="mBtn_EXPENSE" class="py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white">💸 My Expense</button>
+        <button type="button" onclick="setEntryMode('FRIEND_PAID')" id="mBtn_FRIEND_PAID" class="py-2 rounded-xl text-xs font-semibold bg-black text-slate-400 border border-slate-800">🤝 Paid for Friend</button>
+        <button type="button" onclick="setEntryMode('FRIEND_RECEIVED')" id="mBtn_FRIEND_RECEIVED" class="py-2 rounded-xl text-xs font-semibold bg-black text-slate-400 border border-slate-800">↙ Received Back</button>
+        <button type="button" onclick="setEntryMode('CARD_PAYMENT')" id="mBtn_CARD_PAYMENT" class="py-2 rounded-xl text-xs font-semibold bg-black text-slate-400 border border-slate-800">💳 Pay Card Bill</button>
+      </div>
+
+      <div id="wrapContact" class="hidden">
+        <label class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Contact Name</label>
+        <input type="text" id="uContact" list="contactDatalist" placeholder="Type or pick contact" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+        <datalist id="contactDatalist"></datalist>
+      </div>
+
+      <div id="wrapSource">
+        <label id="lblSource" class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Payment Source</label>
+        <select id="uSource" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white"></select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label id="lblAmount" class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Amount (₹)</label>
+          <input type="number" step="0.01" id="uAmount" oninput="syncSplitDefaults()" placeholder="0.00" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-sm font-bold text-white">
+        </div>
+        <div>
+          <label class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Date</label>
+          <input type="date" id="uDate" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white [color-scheme:dark]">
+        </div>
+      </div>
+
+      <div id="wrapSplitToggle" class="hidden space-y-2.5 bg-black/40 p-3 rounded-xl border border-slate-800">
+        <label class="flex items-center gap-2 text-xs text-blue-300 cursor-pointer">
+          <input type="checkbox" id="uSplitCheck" onchange="toggleSplitFields()" class="accent-blue-500"> Split Bill / Cashback Adjustment?
+        </label>
+        <div id="splitFields" class="hidden grid grid-cols-2 gap-2 pt-1">
+          <div><label class="text-[10px] text-slate-400 block mb-1">Friend Owes (₹)</label><input type="number" step="0.01" id="uFriendShare" class="w-full px-2.5 py-2 rounded-lg bg-black border border-slate-700 text-xs text-emerald-400 font-bold"></div>
+          <div><label class="text-[10px] text-slate-400 block mb-1">My Expense Share (₹)</label><input type="number" step="0.01" id="uMyShare" value="0" class="w-full px-2.5 py-2 rounded-lg bg-black border border-slate-700 text-xs text-rose-400 font-bold"></div>
+        </div>
+      </div>
+
+      <div id="wrapCategory">
+        <label class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Category</label>
+        <select id="uCategory" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+          <option value="Food & Dining">Food & Dining</option>
+          <option value="Groceries">Groceries</option>
+          <option value="Transport">Transport</option>
+          <option value="Bills & Utilities">Bills & Utilities</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Others">Others</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-[10px] uppercase text-slate-400 font-semibold block mb-1">Note</label>
+        <input type="text" id="uNote" placeholder="e.g. Flight ticket, Petrol" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      </div>
+
+      <button onclick="submitUniversalEntry()" id="uSaveBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs">Save Entry</button>
+    </div>
+  </div>
+
+  <!-- ==================== ADD / EDIT VAULT MODAL ==================== -->
+  <div id="vaultModal" class="fixed inset-0 max-w-md mx-auto bg-black/80 backdrop-blur-sm z-40 hidden items-end sm:items-center justify-center p-4">
+    <div class="card-dark w-full p-5 rounded-2xl border border-slate-800 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 id="vaultModalTitle" class="text-base font-bold text-white">Add Card / Bank</h3>
+        <button onclick="closeVaultModal()" class="text-slate-400 text-2xl">&times;</button>
+      </div>
+      <input type="hidden" id="vId">
+      <div class="grid grid-cols-2 gap-2">
+        <select id="vType" onchange="updateVaultFormLabels()" class="px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+          <option value="Credit">💳 Credit Card</option>
+          <option value="Debit">💳 Debit Card</option>
+          <option value="Bank">🏦 Bank Account</option>
+        </select>
+        <input type="text" id="vOwner" placeholder="Owner (Me / Friend)" value="Me" class="px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      </div>
+      <input type="text" id="vLabel" placeholder="Card / Bank Name (e.g. HDFC Tata Neu)" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <input type="text" id="vNumber" placeholder="Card Number (16 digits)" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white font-mono">
+      <div class="grid grid-cols-2 gap-2">
+        <input type="text" id="vExpiryOrIfsc" placeholder="Expiry (MM/YY)" class="px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+        <input type="text" id="vCvvOrUpi" placeholder="CVV (3 digits)" class="px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      </div>
+      <input type="text" id="vHolder" placeholder="Name on Card / Account Holder" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <input type="text" id="vNote" placeholder="Optional note (e.g. PIN hint, Branch)" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <button onclick="saveVaultItem()" id="vSaveBtn" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl text-xs">Save to Vault</button>
+    </div>
+  </div>
+
+  <!-- ==================== ADD / EDIT NOTE MODAL ==================== -->
+  <div id="noteModal" class="fixed inset-0 max-w-md mx-auto bg-black/80 backdrop-blur-sm z-40 hidden items-end sm:items-center justify-center p-4">
+    <div class="card-dark w-full p-5 rounded-2xl border border-slate-800 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 id="noteModalTitle" class="text-base font-bold text-white">Personal Note</h3>
+        <button onclick="closeNoteModal()" class="text-slate-400 text-2xl">&times;</button>
+      </div>
+      <input type="hidden" id="nId">
+      <input type="text" id="nTitle" placeholder="Note Title" class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-sm font-semibold text-white">
+      <textarea id="nContent" rows="6" placeholder="Write your note here..." class="w-full px-3 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white resize-none"></textarea>
+      <label class="flex items-center gap-2 text-xs text-amber-300 cursor-pointer">
+        <input type="checkbox" id="nPinned" class="accent-amber-500"> 📌 Pin note to top
+      </label>
+      <button onclick="saveNoteItem()" id="nSaveBtn" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl text-xs">Save Note</button>
+    </div>
+  </div>
+
+  <!-- ==================== HISTOGRAM CHART MODAL ==================== -->
+  <div id="chartModal" class="fixed inset-0 max-w-md mx-auto bg-black/80 backdrop-blur-sm z-40 hidden items-center justify-center p-4">
+    <div class="card-dark w-full p-5 rounded-2xl border border-slate-800 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-base font-bold text-white">Daily Spend & Cumulative Avg</h3>
+        <button onclick="closeChartModal()" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <div class="w-full overflow-x-auto pb-3 pt-6">
+        <div id="histogramContainer" class="flex items-end gap-3 min-w-max h-52 px-2 border-b border-slate-800 relative">
+          <svg id="trendSvg" class="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbyTlu49cvJRMXN349iWHDLRipnS4I898nQ-4-k1OHYvhROEgml4NI20eUHZnWvubFOG/exec";
+
+  let sessionToken = localStorage.getItem('sree_super_token') || '';
+  let state = { cardConfig: {}, cardStats: {}, cardTx: [], expenses: [], daybook: [], vault: [], notes: [] };
+  let activeTab = 'expenses';
+  let entryMode = 'EXPENSE';
+  let vaultFilter = 'ALL';
+  let revealedIds = new Set();
+  let selectedDateFilter = null;
+  let activeCardFilter = null;
+  let activePerson = null;
+
+  window.onload = () => {
+    document.getElementById('uDate').valueAsDate = new Date();
+    if (sessionToken) {
+      document.getElementById('authScreen').classList.add('hidden');
+      loadFromCache();
+      syncAllData(false);
+    }
+  };
+
+  // ==================== AUTH ====================
+  function switchAuthTab(mode) {
+    document.getElementById('authErrorMsg').classList.add('hidden');
+    document.getElementById('passwordAuthForm').classList.toggle('hidden', mode !== 'password');
+    document.getElementById('otpAuthForm').classList.toggle('hidden', mode === 'password');
+    document.getElementById('tabPassBtn').className = mode === 'password' ? 'py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white' : 'py-2 text-xs font-semibold rounded-lg text-slate-400';
+    document.getElementById('tabOtpBtn').className = mode === 'otp' ? 'py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white' : 'py-2 text-xs font-semibold rounded-lg text-slate-400';
+  }
+  function showAuthError(msg) { const el = document.getElementById('authErrorMsg'); el.innerText = msg; el.classList.remove('hidden'); }
+
+  async function loginWithPassword(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginPassBtn');
+    btn.innerText = 'Verifying...'; btn.disabled = true;
+    try {
+      const res = await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'loginPassword', username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value }) });
+      const data = await res.json();
+      if (data.status === 'success') {
+        sessionToken = data.token; localStorage.setItem('sree_super_token', sessionToken);
+        document.getElementById('authScreen').classList.add('hidden');
+        loadFromCache(); syncAllData(true);
+      } else showAuthError(data.message || 'Invalid credentials');
+    } catch { showAuthError('Network error'); }
+    finally { btn.innerText = 'Unlock'; btn.disabled = false; }
+  }
+
+  async function requestEmailOtp() {
+    const btn = document.getElementById('sendOtpBtn'); btn.innerText = 'Sending...'; btn.disabled = true;
+    try {
+      const res = await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'sendOtp' }) });
+      const data = await res.json();
+      btn.innerText = data.status === 'success' ? 'OTP Sent! Check Email' : 'Failed - Retry';
+    } catch { btn.innerText = 'Error - Retry'; btn.disabled = false; }
+  }
+
+  async function verifyEmailOtp() {
+    const res = await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'verifyOtp', otp: document.getElementById('loginOtpInput').value }) });
+    const data = await res.json();
+    if (data.status === 'success') {
+      sessionToken = data.token; localStorage.setItem('sree_super_token', sessionToken);
+      document.getElementById('authScreen').classList.add('hidden');
+      loadFromCache(); syncAllData(true);
+    } else showAuthError(data.message || 'Invalid OTP');
+  }
+
+  function logoutApp() {
+    if (sessionToken) fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'logout', token: sessionToken }) }).catch(() => {});
+    localStorage.removeItem('sree_super_token'); sessionToken = '';
+    document.getElementById('authScreen').classList.remove('hidden');
+  }
+
+  // ==================== CACHE + SYNC ====================
+  function loadFromCache() {
+    const cached = localStorage.getItem('sree_super_cache');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      state = parsed.data;
+      document.getElementById('syncStatus').innerText = 'Cached: ' + parsed.time;
+      renderAll();
+    }
+  }
+
+  async function syncAllData(showSpin) {
+    const btn = document.getElementById('syncBtn');
+    if (showSpin) btn.classList.add('animate-spin');
+    document.getElementById('syncStatus').innerText = 'Syncing...';
+    try {
+      const res = await fetch(`${API_URL}?token=${encodeURIComponent(sessionToken)}`);
+      const data = await res.json();
+      if (data.status === 'unauthorized') return logoutApp();
+      state = data;
+      const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      localStorage.setItem('sree_super_cache', JSON.stringify({ data, time: now }));
+      document.getElementById('syncStatus').innerText = 'Synced at ' + now;
+      renderAll();
+    } catch { document.getElementById('syncStatus').innerText = 'Offline (cached)'; }
+    finally { btn.classList.remove('animate-spin'); }
+  }
+
+  function renderAll() {
+    populateSourceDropdown(); populateContactDatalist();
+    renderExpenses(); renderCards(); renderDaybook(); renderVault(); renderNotes();
+    if (activePerson) renderPersonChat(activePerson);
+  }
+
+  // ==================== NAVIGATION ====================
+  function switchMainTab(tab) {
+    activeTab = tab;
+    ['expenses', 'cards', 'daybook', 'vault', 'notes'].forEach(t => {
+      const cap = t.charAt(0).toUpperCase() + t.slice(1);
+      document.getElementById('tab' + cap).classList.toggle('hidden', t !== tab);
+      document.getElementById('nav' + cap).className = `flex flex-col items-center gap-0.5 ${t === tab ? 'text-blue-400' : 'text-slate-500'}`;
+    });
+    const titles = { expenses: 'Expenses', cards: 'Card Ledger', daybook: 'Daybook', vault: 'Card & Bank Vault', notes: 'Personal Notes' };
+    document.getElementById('headerTitle').innerText = titles[tab];
+    const btn = document.getElementById('headerActionBtn');
+    if (tab === 'expenses') { btn.innerText = '📊 Chart'; btn.onclick = openChartModal; btn.classList.remove('hidden'); }
+    else if (tab === 'cards') { btn.innerText = '⚙️ Cards'; btn.onclick = toggleCardDrawer; btn.classList.remove('hidden'); }
+    else btn.classList.add('hidden');
+  }
+
+  function handleFloatingPlus() {
+    if (activeTab === 'vault') openVaultModal();
+    else if (activeTab === 'notes') openNoteModal();
+    else openUniversalModal();
+  }
+
+  function copyText(txt, label) {
+    navigator.clipboard.writeText(txt).then(() => alert(`Copied ${label}!`));
+  }
+
+  // ==================== TAB 4: VAULT (VISUAL CARDS & BANKS) ====================
+  function setVaultFilter(f) {
+    vaultFilter = f;
+    ['ALL', 'ME', 'FRIENDS', 'BANK'].forEach(k => {
+      document.getElementById('vf_' + k).className = k === f
+        ? 'px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white shrink-0'
+        : 'px-3 py-1.5 rounded-full text-xs font-semibold card-dark text-slate-400 border border-slate-800 shrink-0';
+    });
+    renderVault();
+  }
+
+  function toggleReveal(id) {
+    if (revealedIds.has(id)) revealedIds.delete(id); else revealedIds.add(id);
+    renderVault();
+  }
+
+  function formatCardNum(num, show) {
+    const clean = String(num || '').replace(/\s+/g, '');
+    if (!show) return clean.length >= 4 ? `••••  ••••  ••••  ${clean.slice(-4)}` : '••••';
+    return clean.replace(/(.{4})/g, '$1  ').trim();
+  }
+
+  function renderVault() {
+    let list = state.vault || [];
+    if (vaultFilter === 'ME') list = list.filter(v => v.type !== 'Bank' && v.owner.toLowerCase() === 'me');
+    if (vaultFilter === 'FRIENDS') list = list.filter(v => v.owner.toLowerCase() !== 'me');
+    if (vaultFilter === 'BANK') list = list.filter(v => v.type === 'Bank');
+
+    const container = document.getElementById('vaultList');
+    if (!list.length) { container.innerHTML = `<div class="p-8 card-dark rounded-2xl text-center text-slate-500 text-xs">No saved cards or banks. Tap + to add.</div>`; return; }
+
+    container.innerHTML = list.map(v => {
+      const show = revealedIds.has(v.id);
+      if (v.type === 'Bank') {
+        return `<div class="card-dark rounded-2xl p-4 border border-slate-800 space-y-2.5">
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">🏦 BANK • ${v.owner}</span>
+              <h4 class="text-sm font-bold text-white mt-1">${v.label}</h4>
+            </div>
+            <div class="flex gap-2 text-xs">
+              <button onclick="openVaultModal('${v.id}')" class="text-slate-400 hover:text-white">✏️</button>
+              <button onclick="confirmSoftDelete('Vault','${v.id}','')" class="text-slate-400 hover:text-rose-400">🗑️</button>
+            </div>
+          </div>
+          <div class="bg-black/50 rounded-xl p-3 space-y-1.5 text-xs font-mono">
+            <div class="flex justify-between items-center"><span class="text-slate-400">A/C:</span><span class="text-white cursor-pointer" onclick="copyText('${v.number}','Account No')">${v.number} 📋</span></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">IFSC:</span><span class="text-blue-300 cursor-pointer" onclick="copyText('${v.expiryOrIfsc}','IFSC')">${v.expiryOrIfsc} 📋</span></div>
+            ${v.cvvOrUpi ? `<div class="flex justify-between items-center"><span class="text-slate-400">UPI:</span><span class="text-emerald-300 cursor-pointer" onclick="copyText('${v.cvvOrUpi}','UPI ID')">${v.cvvOrUpi} 📋</span></div>` : ''}
+          </div>
+          <div class="flex justify-between text-[11px] text-slate-400"><span>${v.holderName}</span><span>${v.note}</span></div>
+        </div>`;
+      }
+
+      const bgClass = v.type === 'Debit' ? 'debit-card-bg' : 'credit-card-bg';
+      return `<div class="${bgClass} rounded-2xl p-4 border border-slate-700/70 shadow-xl relative overflow-hidden">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-slate-200 font-semibold">${v.type} • ${v.owner}</span>
+            <h4 class="text-base font-bold text-white mt-1.5">${v.label}</h4>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <button onclick="toggleReveal('${v.id}')" title="Show/Hide">${show ? '🙈' : '👁️'}</button>
+            <button onclick="copyText('${v.number}','Card Number')" title="Copy Number">📋</button>
+            <button onclick="openVaultModal('${v.id}')" title="Edit">✏️</button>
+            <button onclick="confirmSoftDelete('Vault','${v.id}','')" title="Delete">🗑️</button>
+          </div>
+        </div>
+
+        <p class="font-mono text-base tracking-widest text-white mb-4 cursor-pointer" onclick="copyText('${v.number}','Card Number')">${formatCardNum(v.number, show)}</p>
+
+        <div class="flex justify-between items-end text-xs">
+          <div>
+            <span class="text-[9px] uppercase text-slate-400 block">Card Holder</span>
+            <span class="font-semibold text-slate-200">${v.holderName || v.owner}</span>
+          </div>
+          <div class="flex gap-4">
+            <div>
+              <span class="text-[9px] uppercase text-slate-400 block">Expiry</span>
+              <span class="font-mono font-semibold text-white">${v.expiryOrIfsc || '--/--'}</span>
+            </div>
+            <div>
+              <span class="text-[9px] uppercase text-slate-400 block">CVV</span>
+              <span class="font-mono font-semibold text-amber-300 cursor-pointer" onclick="copyText('${v.cvvOrUpi}','CVV')">${show ? (v.cvvOrUpi || '---') : '•••'}</span>
+            </div>
+          </div>
+        </div>
+        ${v.note ? `<p class="text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-white/10">${v.note}</p>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function updateVaultFormLabels() {
+    const isBank = document.getElementById('vType').value === 'Bank';
+    document.getElementById('vNumber').placeholder = isBank ? 'Account Number' : 'Card Number (16 digits)';
+    document.getElementById('vExpiryOrIfsc').placeholder = isBank ? 'IFSC Code' : 'Expiry (MM/YY)';
+    document.getElementById('vCvvOrUpi').placeholder = isBank ? 'UPI ID (optional)' : 'CVV (3 digits)';
+  }
+
+  function openVaultModal(id = null) {
+    if (id) {
+      const v = (state.vault || []).find(x => x.id === id);
+      if (!v) return;
+      document.getElementById('vaultModalTitle').innerText = 'Edit Vault Item';
+      document.getElementById('vId').value = v.id;
+      document.getElementById('vType').value = v.type;
+      document.getElementById('vOwner').value = v.owner;
+      document.getElementById('vLabel').value = v.label;
+      document.getElementById('vNumber').value = v.number;
+      document.getElementById('vExpiryOrIfsc').value = v.expiryOrIfsc;
+      document.getElementById('vCvvOrUpi').value = v.cvvOrUpi;
+      document.getElementById('vHolder').value = v.holderName;
+      document.getElementById('vNote').value = v.note;
+    } else {
+      document.getElementById('vaultModalTitle').innerText = 'Add Card / Bank';
+      ['vId','vLabel','vNumber','vExpiryOrIfsc','vCvvOrUpi','vHolder','vNote'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('vType').value = 'Credit';
+      document.getElementById('vOwner').value = 'Me';
+    }
+    updateVaultFormLabels();
+    document.getElementById('vaultModal').classList.remove('hidden');
+    document.getElementById('vaultModal').classList.add('flex');
+  }
+  function closeVaultModal() { document.getElementById('vaultModal').classList.add('hidden'); document.getElementById('vaultModal').classList.remove('flex'); }
+
+  async function saveVaultItem() {
+    const label = document.getElementById('vLabel').value.trim();
+    const number = document.getElementById('vNumber').value.trim();
+    if (!label || !number) return alert('Enter Card/Bank Name and Number.');
+    const btn = document.getElementById('vSaveBtn'); btn.innerText = 'Saving...'; btn.disabled = true;
+    try {
+      await fetch(API_URL, {
+        method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          action: 'saveVault', token: sessionToken,
+          id: document.getElementById('vId').value,
+          type: document.getElementById('vType').value,
+          owner: document.getElementById('vOwner').value.trim() || 'Me',
+          label, number,
+          expiryOrIfsc: document.getElementById('vExpiryOrIfsc').value.trim(),
+          cvvOrUpi: document.getElementById('vCvvOrUpi').value.trim(),
+          holderName: document.getElementById('vHolder').value.trim(),
+          note: document.getElementById('vNote').value.trim()
+        })
+      });
+      closeVaultModal(); await syncAllData(true);
+    } finally { btn.innerText = 'Save to Vault'; btn.disabled = false; }
+  }
+
+  // ==================== TAB 5: PERSONAL NOTES ====================
+  function renderNotes() {
+    const q = (document.getElementById('noteSearchInput').value || '').toLowerCase();
+    let list = [...(state.notes || [])];
+    if (q) list = list.filter(n => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+    list.sort((a, b) => Number(b.pinned) - Number(a.pinned));
+
+    const container = document.getElementById('notesList');
+    if (!list.length) { container.innerHTML = `<div class="p-8 card-dark rounded-2xl text-center text-slate-500 text-xs">No notes yet. Tap + to write one.</div>`; return; }
+
+    container.innerHTML = list.map(n => `
+      <div class="card-dark p-4 rounded-2xl border ${n.pinned ? 'border-amber-500/40' : 'border-slate-800/80'} cursor-pointer" onclick="openNoteModal('${n.id}')">
+        <div class="flex justify-between items-start mb-1.5">
+          <h4 class="text-sm font-bold text-white">${n.pinned ? '📌 ' : ''}${n.title || 'Untitled Note'}</h4>
+          <button onclick="event.stopPropagation(); confirmSoftDelete('Notes','${n.id}','')" class="text-slate-500 hover:text-rose-400 text-xs">🗑️</button>
+        </div>
+        <p class="text-xs text-slate-300 whitespace-pre-line line-clamp-4">${n.content}</p>
+        <p class="text-[10px] text-slate-500 mt-2">${n.updatedAt}</p>
+      </div>`).join('');
+  }
+
+  function openNoteModal(id = null) {
+    if (id) {
+      const n = (state.notes || []).find(x => x.id === id);
+      if (!n) return;
+      document.getElementById('noteModalTitle').innerText = 'Edit Note';
+      document.getElementById('nId').value = n.id;
+      document.getElementById('nTitle').value = n.title;
+      document.getElementById('nContent').value = n.content;
+      document.getElementById('nPinned').checked = n.pinned;
+    } else {
+      document.getElementById('noteModalTitle').innerText = 'New Personal Note';
+      document.getElementById('nId').value = '';
+      document.getElementById('nTitle').value = '';
+      document.getElementById('nContent').value = '';
+      document.getElementById('nPinned').checked = false;
+    }
+    document.getElementById('noteModal').classList.remove('hidden');
+    document.getElementById('noteModal').classList.add('flex');
+  }
+  function closeNoteModal() { document.getElementById('noteModal').classList.add('hidden'); document.getElementById('noteModal').classList.remove('flex'); }
+
+  async function saveNoteItem() {
+    const title = document.getElementById('nTitle').value.trim();
+    const content = document.getElementById('nContent').value.trim();
+    if (!title && !content) return alert('Write something first.');
+    const btn = document.getElementById('nSaveBtn'); btn.innerText = 'Saving...'; btn.disabled = true;
+    try {
+      await fetch(API_URL, {
+        method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          action: 'saveNote', token: sessionToken,
+          id: document.getElementById('nId').value, title, content,
+          pinned: document.getElementById('nPinned').checked
+        })
+      });
+      closeNoteModal(); await syncAllData(true);
+    } finally { btn.innerText = 'Save Note'; btn.disabled = false; }
+  }
+
+  // ==================== EXPENSES / CARDS / DAYBOOK (CORE) ====================
+  function renderExpenses() {
+    const cat = document.getElementById('filterCategory').value;
+    let list = state.expenses || [];
+    if (cat !== 'ALL') list = list.filter(t => t.category === cat);
+    if (selectedDateFilter) list = list.filter(t => t.date === selectedDateFilter);
+    document.getElementById('totalExpenseAmount').innerText = `₹${list.reduce((s, t) => s + Number(t.amount), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const container = document.getElementById('expenseList');
+    if (!list.length) { container.innerHTML = `<div class="p-8 card-dark rounded-xl text-center text-slate-500 text-xs">No expenses found.</div>`; return; }
+
+    const grouped = {};
+    list.forEach(t => { (grouped[t.date] = grouped[t.date] || []).push(t); });
+    container.innerHTML = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a)).map(d => {
+      const items = grouped[d];
+      const dayTotal = items.reduce((s, x) => s + Number(x.amount), 0);
+      return `<div>
+        <div class="flex justify-between text-[11px] font-bold text-slate-400 uppercase px-1 mb-1.5"><span>${d}</span><span class="text-rose-400">₹${dayTotal.toLocaleString('en-IN')}</span></div>
+        <div class="space-y-2">${items.map(t => `
+          <div class="card-dark p-3 rounded-xl flex justify-between items-center border border-slate-800/60">
+            <div class="min-w-0 pr-2">
+              <div class="flex items-center gap-1.5">
+                <h4 class="text-sm font-medium text-white truncate">${t.note || t.category}</h4>
+                ${t.linkId ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">🔗 ${t.source}</span>` : `<span class="text-[10px] text-slate-500">${t.source}</span>`}
+              </div>
+              <p class="text-[11px] text-slate-400">${t.category}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-sm font-bold text-rose-500">-₹${Number(t.amount).toLocaleString('en-IN')}</span>
+              <button onclick="confirmSoftDelete('Expenses','${t.id}','${t.linkId}')" class="text-slate-500 hover:text-rose-400 text-xs p-1">🗑️</button>
+            </div>
+          </div>`).join('')}</div></div>`;
+    }).join('');
+  }
+
+  function renderCards() {
+    const cfgMap = state.cardConfig || {}, statsMap = state.cardStats || {};
+    const cardNames = Object.keys(cfgMap).sort();
+    const recoverableByCard = {}, friendLinks = new Map();
+    (state.daybook || []).forEach(d => { if (d.type === 'PAID' && d.linkId) friendLinks.set(d.linkId, (friendLinks.get(d.linkId) || 0) + Number(d.amount)); });
+    (state.cardTx || []).forEach(tx => { if (tx.type === 'Spend' && tx.linkId && friendLinks.has(tx.linkId)) recoverableByCard[tx.card] = (recoverableByCard[tx.card] || 0) + friendLinks.get(tx.linkId); });
+
+    const pools = {};
+    cardNames.forEach(n => { const c = cfgMap[n], st = statsMap[n] || { owed: 0 }; if (c.shared && c.bank) { const k = c.bank.toLowerCase(); if (!pools[k]) pools[k] = { limit: c.limit, used: 0 }; pools[k].used += Math.max(0, st.owed); } });
+
+    let totalOwed = 0, totalLimit = 0; const counted = new Set();
+    document.getElementById('cardsContainer').innerHTML = cardNames.map(name => {
+      const c = cfgMap[name], st = statsMap[name] || { spent: 0, paid: 0, owed: 0 };
+      totalOwed += st.owed;
+      const isShared = Boolean(c.shared && c.bank), bKey = isShared ? c.bank.toLowerCase() : null;
+      if (isShared) { if (!counted.has(bKey)) { totalLimit += pools[bKey].limit; counted.add(bKey); } } else totalLimit += c.limit;
+      const effLimit = isShared ? pools[bKey].limit : c.limit, effUsed = isShared ? pools[bKey].used : Math.max(0, st.owed);
+      const pct = effLimit > 0 ? Math.min(100, (effUsed / effLimit) * 100) : 0;
+      const barColor = pct >= 50 ? '#ef4444' : pct >= 30 ? '#f59e0b' : '#10b981';
+      const recAmt = recoverableByCard[name] || 0, safe = name.replace(/'/g, "\\'");
+      return `<div class="card-dark p-4 rounded-2xl border border-slate-800/80 cursor-pointer" onclick="setCardFilter('${safe}')">
+        <div class="flex justify-between items-start mb-2">
+          <div><h4 class="font-bold text-sm text-white">${name}</h4><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${c.bank}${isShared ? ' • Shared' : ''} • Due ${c.dueDay}</span></div>
+          <button onclick="event.stopPropagation(); deleteCard('${safe}')" class="text-slate-500 hover:text-rose-400 text-xs">✕</button>
+        </div>
+        <div class="flex justify-between items-baseline mb-2"><span class="text-xs text-slate-400">Owed</span><span class="text-lg font-bold ${st.owed <= 0 ? 'text-emerald-400' : 'text-rose-400'}">₹${st.owed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+        ${recAmt > 0 ? `<div class="mb-2.5 text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">🤝 ₹${recAmt.toLocaleString('en-IN')} recoverable from friends</div>` : ''}
+        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-2"><div class="h-full" style="width:${pct}%;background:${barColor};"></div></div>
+        <div class="flex justify-between text-[11px] text-slate-400"><span>Avail: ₹${Math.max(0, effLimit - effUsed).toLocaleString('en-IN')}</span><span>Limit: ₹${(effLimit/1000).toFixed(0)}k</span></div>
+      </div>`;
+    }).join('') || `<div class="p-6 text-center text-slate-500 text-xs">No cards configured.</div>`;
+    document.getElementById('totalOwedBanner').innerText = `₹${totalOwed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    document.getElementById('totalAvailBanner').innerText = `₹${Math.max(0, totalLimit - Math.max(0, totalOwed)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (activeCardFilter) renderCardTxList();
+  }
+
+  function setCardFilter(name) {
+    activeCardFilter = name;
+    document.getElementById('cardFilterBanner').classList.toggle('hidden', !name);
+    document.getElementById('cardsContainer').classList.toggle('hidden', Boolean(name));
+    document.getElementById('cardTxContainer').classList.toggle('hidden', !name);
+    if (name) { document.getElementById('cardFilterText').innerHTML = `Card: <strong>${name}</strong>`; renderCardTxList(); }
+  }
+
+  function renderCardTxList() {
+    const list = (state.cardTx || []).filter(t => t.card === activeCardFilter);
+    document.getElementById('cardTxContainer').innerHTML = list.map(t => `
+      <div class="card-dark p-3 rounded-xl flex justify-between items-center border border-slate-800">
+        <div><span class="text-xs font-semibold text-white">${t.notes || t.category} ${t.linkId ? '🔗' : ''}</span><p class="text-[11px] text-slate-400">${t.date} • ${t.category}</p></div>
+        <div class="flex items-center gap-2"><span class="text-sm font-bold ${t.type === 'Payment' ? 'text-emerald-400' : 'text-rose-400'}">${t.type === 'Payment' ? '-' : '+'}₹${Number(t.amount).toLocaleString('en-IN')}</span><button onclick="confirmSoftDelete('Card_Tx','${t.id}','${t.linkId}')" class="text-slate-500 hover:text-rose-400 text-xs">🗑️</button></div>
+      </div>`).join('') || `<div class="p-6 text-center text-slate-500 text-xs">No transactions.</div>`;
+  }
+
+  function renderDaybook() {
+    const q = (document.getElementById('contactSearchInput').value || '').toLowerCase();
+    const map = {};
+    (state.daybook || []).forEach(t => { const k = t.person.toLowerCase(); if (!map[k]) map[k] = { name: t.person, net: 0, count: 0 }; map[k].net += (t.type === 'PAID' ? Number(t.amount) : -Number(t.amount)); map[k].count++; });
+    let arr = Object.values(map), toRec = 0, toPay = 0;
+    arr.forEach(c => { if (c.net > 0) toRec += c.net; else toPay += Math.abs(c.net); });
+    document.getElementById('totalToReceive').innerText = `₹${toRec.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    document.getElementById('totalToPay').innerText = `₹${toPay.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (q) arr = arr.filter(c => c.name.toLowerCase().includes(q));
+    arr.sort((a, b) => a.name.localeCompare(b.name));
+    document.getElementById('contactsList').innerHTML = arr.map(p => `<div onclick="openPersonLedger('${p.name.replace(/'/g, "\\'")}')" class="card-dark px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer border border-slate-800/60">
+      <div><h4 class="text-sm font-semibold text-white">${p.name}</h4><p class="text-[11px] text-slate-400">${p.count} entries</p></div>
+      <div class="text-right"><span class="text-sm font-bold ${p.net >= 0 ? 'text-emerald-400' : 'text-rose-500'}">₹${Math.abs(p.net).toLocaleString('en-IN')}</span><p class="text-[10px] text-slate-400">${p.net >= 0 ? "You'll get" : "You'll pay"}</p></div>
+    </div>`).join('') || `<div class="p-6 text-center text-slate-500 text-xs">No contacts yet.</div>`;
+  }
+
+  function openPersonLedger(name) { activePerson = name; document.getElementById('ledgerPersonName').innerText = name; document.getElementById('personLedgerScreen').classList.remove('hidden'); document.getElementById('personLedgerScreen').classList.add('flex'); renderPersonChat(name); }
+  function closePersonLedger() { activePerson = null; document.getElementById('personLedgerScreen').classList.add('hidden'); document.getElementById('personLedgerScreen').classList.remove('flex'); }
+  function renderPersonChat(name) {
+    const txs = (state.daybook || []).filter(t => t.person.toLowerCase() === name.toLowerCase());
+    let net = 0; txs.forEach(t => net += (t.type === 'PAID' ? Number(t.amount) : -Number(t.amount)));
+    document.getElementById('personNetPill').innerText = net >= 0 ? `You'll get ₹${net.toLocaleString('en-IN')}` : `You'll pay ₹${Math.abs(net).toLocaleString('en-IN')}`;
+    document.getElementById('chatBubblesContainer').innerHTML = txs.map(t => `<div class="flex ${t.type === 'PAID' ? 'justify-end' : 'justify-start'}">
+      <div class="w-[75%] card-dark p-3 rounded-xl border border-slate-800">
+        <div class="flex justify-between"><span class="font-bold text-sm ${t.type === 'PAID' ? 'text-rose-400' : 'text-emerald-400'}">${t.type === 'PAID' ? '-₹' : '+₹'}${Number(t.amount).toLocaleString('en-IN')}</span><div class="flex gap-1.5">${t.linkId ? '<span class="text-[10px]">🔗</span>' : ''}<button onclick="confirmSoftDelete('Daybook','${t.id}','${t.linkId}')" class="text-slate-500 text-[11px]">🗑️</button></div></div>
+        <p class="text-xs text-white mt-1">${t.notes || 'No note'}</p><p class="text-[10px] text-slate-400 mt-1">${t.date} • ${t.source}</p>
+      </div></div>`).join('');
+  }
+
+  // ==================== UNIVERSAL MODAL & HELPERS ====================
+  function populateSourceDropdown() { document.getElementById('uSource').innerHTML = `<option value="Cash / UPI">Cash / UPI</option>` + Object.keys(state.cardConfig || {}).sort().map(c => `<option value="${c}">💳 ${c}</option>`).join(''); }
+  function populateContactDatalist() { document.getElementById('contactDatalist').innerHTML = [...new Set((state.daybook || []).map(t => t.person))].sort().map(n => `<option value="${n}">`).join(''); }
+  function openUniversalModal(presetMode, presetPerson) {
+    document.getElementById('uAmount').value = ''; document.getElementById('uNote').value = ''; document.getElementById('uContact').value = presetPerson || '';
+    document.getElementById('uSplitCheck').checked = false; document.getElementById('splitFields').classList.add('hidden');
+    setEntryMode(presetMode || (activeTab === 'daybook' ? 'FRIEND_PAID' : activeTab === 'cards' ? 'CARD_PAYMENT' : 'EXPENSE'));
+    document.getElementById('universalModal').classList.remove('hidden'); document.getElementById('universalModal').classList.add('flex');
+  }
+  function closeUniversalModal() { document.getElementById('universalModal').classList.add('hidden'); document.getElementById('universalModal').classList.remove('flex'); }
+  function setEntryMode(mode) {
+    entryMode = mode;
+    ['EXPENSE', 'FRIEND_PAID', 'FRIEND_RECEIVED', 'CARD_PAYMENT'].forEach(m => { document.getElementById('mBtn_' + m).className = m === mode ? 'py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white' : 'py-2 rounded-xl text-xs font-semibold bg-black text-slate-400 border border-slate-800'; });
+    document.getElementById('wrapContact').classList.toggle('hidden', mode !== 'FRIEND_PAID' && mode !== 'FRIEND_RECEIVED');
+    document.getElementById('wrapSource').classList.toggle('hidden', mode === 'FRIEND_RECEIVED');
+    document.getElementById('wrapSplitToggle').classList.toggle('hidden', mode !== 'FRIEND_PAID');
+    document.getElementById('wrapCategory').classList.toggle('hidden', mode === 'FRIEND_RECEIVED' || mode === 'CARD_PAYMENT');
+  }
+  function toggleSplitFields() { const s = document.getElementById('uSplitCheck').checked; document.getElementById('splitFields').classList.toggle('hidden', !s); if (s) syncSplitDefaults(); }
+  function syncSplitDefaults() { if (entryMode === 'FRIEND_PAID' && !document.getElementById('uSplitCheck').checked) { document.getElementById('uFriendShare').value = document.getElementById('uAmount').value; document.getElementById('uMyShare').value = 0; } }
+
+  async function submitUniversalEntry() {
+    const amt = parseFloat(document.getElementById('uAmount').value), date = document.getElementById('uDate').value;
+    if (!amt || amt <= 0 || !date) return alert('Enter valid amount & date.');
+    const isSplit = document.getElementById('uSplitCheck').checked;
+    const payload = { action: 'addEntry', token: sessionToken, mode: entryMode, date, amount: amt, totalAmount: amt, friendAmount: isSplit ? (parseFloat(document.getElementById('uFriendShare').value) || 0) : amt, myAmount: isSplit ? (parseFloat(document.getElementById('uMyShare').value) || 0) : 0, source: document.getElementById('uSource').value, card: document.getElementById('uSource').value, category: document.getElementById('uCategory').value, person: document.getElementById('uContact').value.trim(), note: document.getElementById('uNote').value.trim() };
+    const btn = document.getElementById('uSaveBtn'); btn.innerText = 'Saving...'; btn.disabled = true;
+    try { await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(payload) }); closeUniversalModal(); await syncAllData(true); }
+    finally { btn.innerText = 'Save Entry'; btn.disabled = false; }
+  }
+
+  async function confirmSoftDelete(target, id, linkId) {
+    let deleteLinked = false;
+    if (linkId) { if (!confirm('🔗 Linked entry! Click OK to soft-delete ALL linked records together.')) return; deleteLinked = true; }
+    else { if (!confirm('Move to trash (Soft Delete)?')) return; }
+    await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'softDelete', token: sessionToken, target, id, linkId, deleteLinked }) });
+    await syncAllData(true);
+  }
+
+  function toggleCardDrawer() { document.getElementById('manageCardDrawer').classList.toggle('hidden'); }
+  document.getElementById('addCardForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const bank = document.getElementById('newBankName').value.trim(), variant = document.getElementById('newCardName').value.trim();
+    const full = variant.toLowerCase().startsWith(bank.toLowerCase()) ? variant : `${bank} ${variant}`;
+    await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'addCard', token: sessionToken, bank, card: full, limit: document.getElementById('newCardLimit').value, dueDay: document.getElementById('newCardDue').value, shared: document.getElementById('isSharedLimit').checked }) });
+    toggleCardDrawer(); await syncAllData(true);
+  });
+  async function deleteCard(name) { if (!confirm(`Remove "${name}"?`)) return; await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'deleteCard', token: sessionToken, card: name }) }); await syncAllData(true); }
+  function openChartModal() { renderHistogram(); document.getElementById('chartModal').classList.remove('hidden'); document.getElementById('chartModal').classList.add('flex'); }
+  function closeChartModal() { document.getElementById('chartModal').classList.add('hidden'); document.getElementById('chartModal').classList.remove('flex'); }
+  function resetDateFilter() { selectedDateFilter = null; document.getElementById('clearDateFilter').classList.add('hidden'); renderExpenses(); }
+
+  function renderHistogram() {
+    const container = document.getElementById('histogramContainer'), svg = document.getElementById('trendSvg');
+    container.querySelectorAll('.bar-col').forEach(e => e.remove()); svg.innerHTML = '';
+    const totals = {}; (state.expenses || []).forEach(t => { totals[t.date] = (totals[t.date] || 0) + Number(t.amount); });
+    const dates = Object.keys(totals).sort((a, b) => new Date(a) - new Date(b)); if (!dates.length) return;
+    const max = Math.max(...Object.values(totals), 1), h = 120, pad = 28; let sum = 0; const pts = [];
+    dates.forEach((d, i) => {
+      const amt = totals[d]; sum += amt; const avg = sum / (i + 1), barH = Math.max(Math.round((amt / max) * h), 12);
+      const col = document.createElement('div'); col.className = 'bar-col flex flex-col items-center justify-end h-full w-14 shrink-0 cursor-pointer';
+      col.onclick = () => { selectedDateFilter = d; document.getElementById('clearDateFilter').classList.remove('hidden'); closeChartModal(); renderExpenses(); };
+      col.innerHTML = `<span class="text-[10px] text-rose-400 font-semibold mb-1">₹${Math.round(amt)}</span><div style="height:${barH}px" class="w-8 bg-rose-500/80 rounded-t-lg"></div><span class="text-[10px] text-slate-300 mt-1.5">${d.slice(5)}</span>`;
+      container.appendChild(col); pts.push({ x: i * 68 + 36, y: h - Math.min((avg / max) * h, h) + pad });
+    });
+    svg.setAttribute('width', dates.length * 68 + 16); svg.setAttribute('height', h + pad + 16);
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' ')); poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#38bdf8'); poly.setAttribute('stroke-width', '2.5');
+    svg.appendChild(poly);
+  }
+</script>
+</body>
+</html>
