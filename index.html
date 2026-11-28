@@ -555,7 +555,7 @@
 
     try {
       if (isSetup) {
-        if (pin.length < 1) {
+        if (pin.length < 4) {
           errEl.innerText = 'Use at least 6 characters (a passphrase is strongest).';
           errEl.classList.remove('hidden'); return;
         }
