@@ -997,6 +997,22 @@
     }).join('') || `<div class="p-8 card-dark rounded-2xl text-center text-slate-500 text-xs">No notes yet. Tap + to create a List or Note.</div>`;
   }
 
+  let noteInitialSnapshot = '';
+
+  function getNoteSnapshot() {
+    const noteType = document.getElementById('nType').value;
+    const content = noteType === 'LIST'
+      ? JSON.stringify(checklistItems.filter(i => i.text.trim() !== ''))
+      : document.getElementById('nContent').value.trim();
+    return JSON.stringify({
+      title: document.getElementById('nTitle').value.trim(),
+      content,
+      pinned: document.getElementById('nPinned').checked,
+      attach: document.getElementById('nExistingAttach').value,
+      loc: document.getElementById('nLocation').value.trim()
+    });
+  }
+
   function openNoteModal(id = null, forceType = 'TEXT') {
     closeNoteFabMenu(); pendingFile = null; document.getElementById('nFileInput').value = ''; document.getElementById('selectedFileName').classList.add('hidden'); checkedCollapsed = false; document.getElementById('editorPhotoPreviewWrap').classList.add('hidden');
     if (id) {
@@ -1013,9 +1029,34 @@
     if (thumb) { document.getElementById('editorPhotoPreview').src = thumb; document.getElementById('editorPhotoPreviewWrap').classList.remove('hidden'); document.getElementById('existingAttachBar').classList.add('hidden'); }
     else { document.getElementById('existingAttachBar').classList.toggle('hidden', !existingUrl); if (existingUrl) document.getElementById('existingAttachLink').href = existingUrl.replace('#img', ''); }
     const loc = document.getElementById('nLocation').value; document.getElementById('locationBar').classList.toggle('hidden', !loc); if (loc) document.getElementById('locationMapLink').href = `https://www.google.com/maps?q=${encodeURIComponent(loc)}`;
+
+    noteInitialSnapshot = getNoteSnapshot();
+    history.pushState({ noteModalOpen: true }, '');
     document.getElementById('noteModal').classList.remove('hidden'); document.getElementById('noteModal').classList.add('flex');
   }
-  function closeNoteModal() { document.getElementById('noteModal').classList.add('hidden'); document.getElementById('noteModal').classList.remove('flex'); }
+
+  async function closeNoteModal(skipAutoSave = false) {
+    if (!skipAutoSave) {
+      const current = getNoteSnapshot();
+      const parsed = JSON.parse(current);
+      const hasData = parsed.title || (parsed.content && parsed.content !== '[]') || pendingFile || parsed.loc;
+      if (hasData && (current !== noteInitialSnapshot || pendingFile)) {
+        await saveNoteItem();
+        return;
+      }
+    }
+    document.getElementById('noteModal').classList.add('hidden');
+    document.getElementById('noteModal').classList.remove('flex');
+  }
+
+  // Catch Android's hardware/swipe Back button while Note editor is open
+  window.addEventListener('popstate', () => {
+    const modal = document.getElementById('noteModal');
+    if (modal && !modal.classList.contains('hidden')) {
+      closeNoteModal(false);
+    }
+  });
+  
   function captureNoteLocation() {
     if (!navigator.geolocation) return alert('Geolocation not supported.');
     const btn = document.getElementById('locCaptureBtn'); btn.innerText = 'Locating...'; btn.disabled = true;
@@ -1122,12 +1163,45 @@
     const rawContent = noteType === 'LIST' ? JSON.stringify(checklistItems.filter(i => i.text.trim() !== '')) : document.getElementById('nContent').value.trim();
     const loc = document.getElementById('nLocation').value.trim();
     if (!rawTitle && !rawContent && !pendingFile && !loc) return alert('Write something first.');
-    const btn = document.getElementById('nSaveBtn'); btn.innerText = 'Encrypting...'; btn.disabled = true;
+
+    const btn = document.getElementById('nSaveBtn');
+    btn.innerText = pendingFile ? 'Uploading photo...' : 'Encrypting...';
+    btn.disabled = true;
+
     try {
       const encTitle = await encryptField(rawTitle), encContent = await encryptField(rawContent);
-      await fetch(API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'saveNote', token: sessionToken, id: document.getElementById('nId').value, title: encTitle, content: encContent, noteType, pinned: document.getElementById('nPinned').checked, location: loc, attachmentUrl: document.getElementById('nExistingAttach').value, fileBase64: pendingFile ? pendingFile.base64 : '', fileName: pendingFile ? pendingFile.name : '', fileMime: pendingFile ? pendingFile.mime : '' }) });
-      closeNoteModal(); await syncAllData(true);
-    } finally { btn.innerText = 'Encrypt & Save'; btn.disabled = false; }
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          action: 'saveNote', token: sessionToken,
+          id: document.getElementById('nId').value,
+          title: encTitle, content: encContent, noteType,
+          pinned: document.getElementById('nPinned').checked,
+          location: loc,
+          attachmentUrl: document.getElementById('nExistingAttach').value,
+          fileBase64: pendingFile ? pendingFile.base64 : '',
+          fileName: pendingFile ? pendingFile.name : '',
+          fileMime: pendingFile ? pendingFile.mime : ''
+        })
+      });
+
+      const data = await res.json();
+      if (data.status === 'unauthorized') return logoutApp();
+      if (data.status !== 'success') {
+        alert('Save failed: ' + (data.message || 'Unknown error from Apps Script'));
+        return;
+      }
+
+      pendingFile = null;
+      closeNoteModal(true);
+      await syncAllData(true);
+    } catch (err) {
+      alert('Network / Upload error: ' + err.message);
+    } finally {
+      btn.innerText = 'Encrypt & Save';
+      btn.disabled = false;
+    }
   }
 
   // ==================== VAULT ====================
