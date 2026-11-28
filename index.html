@@ -626,7 +626,7 @@
     const btn = document.getElementById('cpSaveBtn');
 
     errEl.classList.add('hidden');
-    if (newPin.length < 6) { errEl.innerText = 'New passphrase must be at least 6 characters.'; errEl.classList.remove('hidden'); return; }
+    if (newPin.length < 4) { errEl.innerText = 'New passphrase must be at least 6 characters.'; errEl.classList.remove('hidden'); return; }
     if (newPin !== confPin) { errEl.innerText = 'New passphrases do not match.'; errEl.classList.remove('hidden'); return; }
 
     btn.innerText = 'Verifying & Re-encrypting...'; btn.disabled = true;
