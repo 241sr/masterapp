@@ -57,7 +57,8 @@
       <h1 id="headerTitle" class="text-xl font-semibold text-white tracking-wide">Expenses</h1>
       <p id="syncStatus" class="text-[11px] text-slate-400">Loading...</p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5">
+      <button id="changePinHeaderBtn" onclick="openChangePinModal()" title="Change Vault Passphrase" class="hidden w-8 h-8 rounded-xl card-dark border border-slate-800 flex items-center justify-center text-xs text-amber-300 hover:text-white">🔑</button>
       <button id="headerActionBtn" onclick="openChartModal()" class="px-3 py-1.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 hover:text-white">📊 Chart</button>
       <button onclick="syncAllData(true)" id="syncBtn" title="Sync Now" class="w-8 h-8 rounded-xl card-dark border border-slate-800 flex items-center justify-center text-xs text-slate-300">🔄</button>
       <button onclick="logoutApp()" title="Lock App" class="w-8 h-8 rounded-xl card-dark border border-slate-800 flex items-center justify-center text-xs text-slate-300 hover:text-rose-400">🔒</button>
@@ -169,16 +170,17 @@
     <div id="contactsList" class="space-y-2.5"></div>
   </div>
 
-  <!-- ==================== VAULT PIN LOCK OVERLAY (FOR VAULT & NOTES) ==================== -->
+  <!-- ==================== ZERO-KNOWLEDGE VAULT PIN GATE ==================== -->
   <div id="vaultPinGate" class="hidden flex-1 flex flex-col justify-center px-6 py-10">
     <div class="card-dark rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
       <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto text-xl">🔐</div>
       <div class="text-center">
-        <h3 class="text-base font-bold text-white">Encrypted Vault & Notes</h3>
-        <p class="text-xs text-slate-400 mt-1">Enter your Vault PIN to decrypt cards & notes</p>
+        <h3 id="vaultGateTitle" class="text-base font-bold text-white">Encrypted Vault & Notes</h3>
+        <p id="vaultGateSub" class="text-xs text-slate-400 mt-1">Enter your Vault Passphrase to decrypt locally</p>
       </div>
       <form onsubmit="unlockVaultWithPin(event)" class="space-y-3">
-        <input type="password" id="vaultPinInput" required placeholder="Enter Vault PIN" class="w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-center tracking-widest text-base font-bold text-white focus:outline-none focus:border-amber-500">
+        <input type="password" id="vaultPinInput" required placeholder="Enter Vault Passphrase / PIN" class="w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-center tracking-wider text-sm font-bold text-white focus:outline-none focus:border-amber-500">
+        <input type="password" id="vaultPinConfirm" placeholder="Confirm Passphrase / PIN" class="hidden w-full px-4 py-3 rounded-xl bg-black border border-slate-800 text-center tracking-wider text-sm font-bold text-white focus:outline-none focus:border-amber-500">
         <button type="submit" id="vaultUnlockBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs">Decrypt & Open</button>
       </form>
       <p id="vaultPinError" class="text-xs text-rose-400 text-center hidden"></p>
@@ -223,6 +225,22 @@
     <button onclick="switchMainTab('daybook')" id="navDaybook" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">📒</span><span class="text-[10px] font-medium">Daybook</span></button>
     <button onclick="switchMainTab('vault')" id="navVault" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">🔐</span><span class="text-[10px] font-medium">Vault</span></button>
     <button onclick="switchMainTab('notes')" id="navNotes" class="flex flex-col items-center gap-0.5 text-slate-500"><span class="text-base">📝</span><span class="text-[10px] font-medium">Notes</span></button>
+  </div>
+
+  <!-- ==================== CHANGE VAULT PASSPHRASE MODAL ==================== -->
+  <div id="changePinModal" class="fixed inset-0 max-w-md mx-auto bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="card-dark w-full p-5 rounded-2xl border border-slate-800 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white">🔑 Change Vault Passphrase</h3>
+        <button onclick="closeChangePinModal()" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <p class="text-[11px] text-slate-400">Re-encrypts all existing Vault cards, banks, and Notes with your new passphrase.</p>
+      <input type="password" id="cpOldPin" placeholder="Current Passphrase / PIN" class="w-full px-3.5 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <input type="password" id="cpNewPin" placeholder="New Passphrase (min 6 chars)" class="w-full px-3.5 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <input type="password" id="cpConfirmPin" placeholder="Confirm New Passphrase" class="w-full px-3.5 py-2.5 rounded-xl bg-black border border-slate-800 text-xs text-white">
+      <p id="cpError" class="text-xs text-rose-400 hidden"></p>
+      <button onclick="submitChangeVaultPin()" id="cpSaveBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs">Re-Encrypt & Save</button>
+    </div>
   </div>
 
   <!-- ==================== PERSON CHAT LEDGER MODAL ==================== -->
@@ -363,7 +381,7 @@
     </div>
   </div>
 
-  <!-- ==================== KEEP-STYLE NOTE / CHECKLIST MODAL (PHOTOS + LOCATION) ==================== -->
+  <!-- ==================== KEEP-STYLE NOTE / CHECKLIST MODAL ==================== -->
   <div id="noteModal" class="fixed inset-0 max-w-md mx-auto bg-black z-40 hidden flex-col p-4">
     <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-800">
       <button onclick="closeNoteModal()" class="text-slate-300 text-xl px-1">←</button>
@@ -375,7 +393,6 @@
     <input type="hidden" id="nId"><input type="hidden" id="nType" value="TEXT"><input type="hidden" id="nExistingAttach" value=""><input type="hidden" id="nLocation" value="">
     <input type="text" id="nTitle" placeholder="Title" class="w-full bg-transparent text-lg font-bold text-white placeholder-slate-500 focus:outline-none mb-2">
 
-    <!-- Inline Photo Preview inside Editor -->
     <div id="editorPhotoPreviewWrap" class="hidden mb-3 relative">
       <img id="editorPhotoPreview" src="" alt="Note Photo" class="w-full max-h-48 object-cover rounded-xl border border-slate-800">
       <button type="button" onclick="clearAttachment()" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white text-xs">✕</button>
@@ -393,7 +410,6 @@
       </div>
     </div>
 
-    <!-- Location & Attachment Controls -->
     <div class="pt-3 border-t border-slate-800 space-y-2">
       <div id="locationBar" class="hidden flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs">
         <a id="locationMapLink" href="#" target="_blank" class="text-emerald-400 underline truncate">📍 View Location on Maps</a>
@@ -437,10 +453,10 @@
 </div>
 
 <script>
-  const API_URL = "https://script.google.com/macros/s/AKfycbzgXfrHASmuQ0IXj6N_obFmDVGzTpbH4K7Y7zvN6oHGU2SvLbUmes6y18mENkN7QIM9/exec";
+  const API_URL = "https://script.google.com/macros/s/AKfycbxpK0thuqAdF0uz47DUj0EHMJWXh8AVwqVIEL2pLupsw7ft85SleI5_1sQVUHcADi3b/exec";
 
   let sessionToken = localStorage.getItem('sree_super_token') || '';
-  let state = { cardConfig: {}, cardStats: {}, cardTx: [], expenses: [], daybook: [], vault: [], notes: [] };
+  let state = { vaultCanary: '', cardConfig: {}, cardStats: {}, cardTx: [], expenses: [], daybook: [], vault: [], notes: [] };
   let vaultCryptoKey = null;
   let decryptedVault = [];
   let decryptedNotes = [];
@@ -495,7 +511,7 @@
 
   function openCredApp() { window.location.href = 'intent://#Intent;scheme=cred;package=com.dreamplug.androidapp;end'; }
 
-  // ==================== CLIENT-SIDE AES-GCM ENCRYPTION + SERVER PIN CHECK ====================
+  // ==================== ZERO-KNOWLEDGE AES-GCM ENCRYPTION ====================
   async function deriveVaultKey(pin) {
     const enc = new TextEncoder();
     const keyMat = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
@@ -505,11 +521,12 @@
     );
   }
 
-  async function encryptField(plainText) {
-    if (!plainText || !vaultCryptoKey) return plainText || '';
+  async function encryptField(plainText, keyObj) {
+    const key = keyObj || vaultCryptoKey;
+    if (!plainText || !key) return plainText || '';
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encoded = new TextEncoder().encode(String(plainText));
-    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, vaultCryptoKey, encoded);
+    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
     const combined = new Uint8Array(iv.length + cipherBuf.byteLength);
     combined.set(iv, 0); combined.set(new Uint8Array(cipherBuf), iv.length);
     return 'ENC:' + btoa(String.fromCharCode(...combined));
@@ -528,34 +545,140 @@
   async function unlockVaultWithPin(e) {
     e.preventDefault();
     const pin = document.getElementById('vaultPinInput').value;
+    const confirmPin = document.getElementById('vaultPinConfirm').value;
     const errEl = document.getElementById('vaultPinError');
     const btn = document.getElementById('vaultUnlockBtn');
-    errEl.classList.add('hidden'); btn.innerText = 'Verifying PIN...'; btn.disabled = true;
+    const isSetup = !state.vaultCanary;
+
+    errEl.classList.add('hidden');
+    btn.disabled = true;
 
     try {
-      // 1. Verify against VAULT_PIN configured in Code.gs
-      const res = await fetch(API_URL, {
-        method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({ action: 'verifyVaultPin', token: sessionToken, pin })
-      });
-      const check = await res.json();
-      if (check.status === 'unauthorized') return logoutApp();
-      if (check.status !== 'success') {
-        errEl.innerText = check.message || 'Incorrect Vault PIN.';
-        errEl.classList.remove('hidden');
-        return;
+      if (isSetup) {
+        if (pin.length < 6) {
+          errEl.innerText = 'Use at least 6 characters (a passphrase is strongest).';
+          errEl.classList.remove('hidden'); return;
+        }
+        if (pin !== confirmPin) {
+          errEl.innerText = 'Passphrases do not match.';
+          errEl.classList.remove('hidden'); return;
+        }
+        btn.innerText = 'Setting up encryption...';
+        const newKey = await deriveVaultKey(pin);
+        const canary = await encryptField('SREE_VAULT_OK', newKey);
+
+        const res = await fetch(API_URL, {
+          method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+          body: JSON.stringify({ action: 'setVaultCanary', token: sessionToken, canary })
+        });
+        const data = await res.json();
+        if (data.status !== 'success') {
+          errEl.innerText = data.message || 'Setup failed.';
+          errEl.classList.remove('hidden'); return;
+        }
+        state.vaultCanary = canary;
+        vaultCryptoKey = newKey;
+      } else {
+        btn.innerText = 'Decrypting locally...';
+        const testKey = await deriveVaultKey(pin);
+        try {
+          const check = await decryptField(state.vaultCanary, testKey);
+          if (check !== 'SREE_VAULT_OK') throw new Error('Mismatch');
+        } catch {
+          errEl.innerText = 'Incorrect Vault Passphrase / PIN.';
+          errEl.classList.remove('hidden'); return;
+        }
+        vaultCryptoKey = testKey;
       }
 
-      // 2. Derive AES-GCM key and decrypt Vault & Notes
-      vaultCryptoKey = await deriveVaultKey(pin);
       document.getElementById('vaultPinInput').value = '';
+      document.getElementById('vaultPinConfirm').value = '';
       await decryptAllProtectedData();
       updateProtectedTabVisibility();
     } catch {
-      errEl.innerText = 'Could not verify PIN. Check connection.';
+      errEl.innerText = 'Encryption error on this browser.';
       errEl.classList.remove('hidden');
     } finally {
-      btn.innerText = 'Decrypt & Open'; btn.disabled = false;
+      btn.disabled = false;
+      btn.innerText = state.vaultCanary ? 'Decrypt & Open' : 'Set Passphrase & Unlock';
+    }
+  }
+
+  // ==================== CHANGE VAULT PASSPHRASE (RE-ENCRYPT ALL) ====================
+  function openChangePinModal() {
+    document.getElementById('cpOldPin').value = '';
+    document.getElementById('cpNewPin').value = '';
+    document.getElementById('cpConfirmPin').value = '';
+    document.getElementById('cpError').classList.add('hidden');
+    document.getElementById('changePinModal').classList.remove('hidden');
+    document.getElementById('changePinModal').classList.add('flex');
+  }
+  function closeChangePinModal() {
+    document.getElementById('changePinModal').classList.add('hidden');
+    document.getElementById('changePinModal').classList.remove('flex');
+  }
+
+  async function submitChangeVaultPin() {
+    const oldPin = document.getElementById('cpOldPin').value;
+    const newPin = document.getElementById('cpNewPin').value;
+    const confPin = document.getElementById('cpConfirmPin').value;
+    const errEl = document.getElementById('cpError');
+    const btn = document.getElementById('cpSaveBtn');
+
+    errEl.classList.add('hidden');
+    if (newPin.length < 6) { errEl.innerText = 'New passphrase must be at least 6 characters.'; errEl.classList.remove('hidden'); return; }
+    if (newPin !== confPin) { errEl.innerText = 'New passphrases do not match.'; errEl.classList.remove('hidden'); return; }
+
+    btn.innerText = 'Verifying & Re-encrypting...'; btn.disabled = true;
+    try {
+      // 1. Verify current passphrase locally against canary
+      const oldKey = await deriveVaultKey(oldPin);
+      try {
+        const check = await decryptField(state.vaultCanary, oldKey);
+        if (check !== 'SREE_VAULT_OK') throw new Error('Wrong');
+      } catch {
+        errEl.innerText = 'Current passphrase is incorrect.'; errEl.classList.remove('hidden'); return;
+      }
+
+      // 2. Derive new key & create new canary
+      const newKey = await deriveVaultKey(newPin);
+      const newCanary = await encryptField('SREE_VAULT_OK', newKey);
+
+      // 3. Re-encrypt all existing decrypted Vault & Notes items with newKey
+      const vaultUpdates = await Promise.all(decryptedVault.map(async v => ({
+        id: v.id,
+        number: await encryptField(v.number, newKey),
+        expiryOrIfsc: await encryptField(v.expiryOrIfsc, newKey),
+        cvvOrUpi: await encryptField(v.cvvOrUpi, newKey),
+        custIdCif: await encryptField(v.custIdCif, newKey),
+        note: await encryptField(v.note, newKey)
+      })));
+
+      const noteUpdates = await Promise.all(decryptedNotes.map(async n => ({
+        id: n.id,
+        title: await encryptField(n.title, newKey),
+        content: await encryptField(n.content, newKey)
+      })));
+
+      // 4. Send batch update to Code.gs
+      const res = await fetch(API_URL, {
+        method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action: 'rotateVaultKey', token: sessionToken, newCanary, vaultUpdates, noteUpdates })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') {
+        errEl.innerText = data.message || 'Failed to update passphrase.'; errEl.classList.remove('hidden'); return;
+      }
+
+      vaultCryptoKey = newKey;
+      state.vaultCanary = newCanary;
+      closeChangePinModal();
+      await syncAllData(true);
+      alert('✓ Vault passphrase changed and all items re-encrypted!');
+    } catch {
+      errEl.innerText = 'Network or encryption error.'; errEl.classList.remove('hidden');
+    } finally {
+      btn.innerText = 'Re-Encrypt & Save'; btn.disabled = false;
     }
   }
 
@@ -591,12 +714,20 @@
     const isProtected = activeTab === 'vault' || activeTab === 'notes';
     const isUnlocked = Boolean(vaultCryptoKey);
     document.getElementById('vaultPinGate').classList.toggle('hidden', !isProtected || isUnlocked);
+
+    const needsSetup = !state.vaultCanary;
+    document.getElementById('vaultGateTitle').innerText = needsSetup ? 'Create Zero-Knowledge Passphrase' : 'Encrypted Vault & Notes';
+    document.getElementById('vaultGateSub').innerText = needsSetup ? 'Never saved on server — write it down safely' : 'Enter your Vault Passphrase to decrypt locally';
+    document.getElementById('vaultPinConfirm').classList.toggle('hidden', !needsSetup);
+    document.getElementById('vaultUnlockBtn').innerText = needsSetup ? 'Set Passphrase & Unlock' : 'Decrypt & Open';
+
     document.getElementById('tabVault').classList.toggle('hidden', activeTab !== 'vault' || !isUnlocked);
     document.getElementById('tabNotes').classList.toggle('hidden', activeTab !== 'notes' || !isUnlocked);
     document.getElementById('mainFabBtn').classList.toggle('hidden', isProtected && !isUnlocked);
+    document.getElementById('changePinHeaderBtn').classList.toggle('hidden', !(isProtected && isUnlocked));
 
     const btn = document.getElementById('headerActionBtn');
-    if (isProtected && isUnlocked) { btn.innerText = '🔐 Lock Vault'; btn.onclick = lockVaultNow; btn.classList.remove('hidden'); }
+    if (isProtected && isUnlocked) { btn.innerText = '🔐 Lock'; btn.onclick = lockVaultNow; btn.classList.remove('hidden'); }
     else if (isProtected && !isUnlocked) { btn.classList.add('hidden'); }
   }
 
@@ -756,6 +887,7 @@
     renderExpenses(); renderCards(); renderDaybook();
     if (vaultCryptoKey) decryptAllProtectedData();
     if (activePerson) renderPersonChat(activePerson);
+    updateProtectedTabVisibility();
   }
 
   // ==================== BILLING CYCLE ====================
@@ -812,7 +944,7 @@
   function toggleNoteFabMenu() { const m = document.getElementById('noteFabMenu'); const h = m.classList.toggle('hidden'); document.getElementById('fabIcon').style.transform = h ? 'rotate(0deg)' : 'rotate(45deg)'; }
   function closeNoteFabMenu() { document.getElementById('noteFabMenu').classList.add('hidden'); document.getElementById('fabIcon').style.transform = 'rotate(0deg)'; }
 
-  // ==================== NOTES (PHOTOS + LOCATION + LAST EDITED SORT) ====================
+  // ==================== NOTES ====================
   function renderNotes() {
     const q = (document.getElementById('noteSearchInput').value || '').toLowerCase();
     let list = [...decryptedNotes];
@@ -951,7 +1083,7 @@
     } finally { btn.innerText = 'Encrypt & Save'; btn.disabled = false; }
   }
 
-  // ==================== VAULT (SEARCH + ARCHIVE EXPIRED CARDS) ====================
+  // ==================== VAULT ====================
   function setVaultFilter(f) {
     vaultFilter = f;
     ['ALL', 'ME', 'DEBIT', 'FRIENDS', 'BANK', 'ARCHIVED'].forEach(k => {
@@ -998,9 +1130,7 @@
       if (vaultFilter === 'BANK') list = list.filter(v => v.type === 'Bank');
     }
 
-    if (q) {
-      list = list.filter(v => [v.label, v.owner, v.holderName, v.branch, v.note, v.number].some(f => String(f || '').toLowerCase().includes(q)));
-    }
+    if (q) list = list.filter(v => [v.label, v.owner, v.holderName, v.branch, v.note, v.number].some(f => String(f || '').toLowerCase().includes(q)));
 
     const container = document.getElementById('vaultList');
     if (!list.length) { container.innerHTML = `<div class="p-8 card-dark rounded-2xl text-center text-slate-500 text-xs">No saved items found.</div>`; return; }
