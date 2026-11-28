@@ -398,7 +398,7 @@
     </div>
   </div>
 
-  <!-- ==================== KEEP-STYLE NOTE / CHECKLIST MODAL ==================== -->
+<!-- ==================== KEEP-STYLE NOTE / CHECKLIST MODAL ==================== -->
   <div id="noteModal" class="fixed inset-0 max-w-md mx-auto bg-black z-40 hidden flex-col p-4">
     <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-800">
       <button onclick="closeNoteModal()" class="text-slate-300 text-xl px-1">←</button>
@@ -433,14 +433,32 @@
         <a id="existingAttachLink" href="#" target="_blank" class="text-blue-400 underline truncate">📎 View Attached File</a>
         <button type="button" onclick="clearAttachment()" class="text-rose-400 text-xs ml-2">✕</button>
       </div>
-      <div class="grid grid-cols-2 gap-2">
-        <label class="flex items-center justify-center gap-1.5 py-2.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 cursor-pointer hover:text-white">
-          <span>🖼️ Photo / PDF</span>
+      <div class="grid grid-cols-3 gap-2">
+        <button type="button" onclick="openInAppCamera()" class="py-2.5 rounded-xl card-dark border border-slate-800 text-xs text-blue-300 font-semibold hover:text-white">📷 Camera</button>
+        <label class="flex items-center justify-center gap-1 py-2.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 cursor-pointer hover:text-white">
+          <span>🖼️ File</span>
           <input type="file" id="nFileInput" accept="image/*,application/pdf" class="hidden" onchange="previewSelectedFile(event)">
         </label>
-        <button type="button" id="locCaptureBtn" onclick="captureNoteLocation()" class="py-2.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 hover:text-white">📍 Add Location</button>
+        <button type="button" id="locCaptureBtn" onclick="captureNoteLocation()" class="py-2.5 rounded-xl card-dark border border-slate-800 text-xs text-slate-300 hover:text-white">📍 Map</button>
       </div>
       <p id="selectedFileName" class="text-[11px] text-emerald-400 text-center hidden"></p>
+    </div>
+  </div>
+
+  <!-- ==================== IN-APP CAMERA MODAL ==================== -->
+  <div id="cameraModal" class="fixed inset-0 max-w-md mx-auto bg-black z-50 hidden flex-col justify-between p-4">
+    <div class="flex justify-between items-center pb-2">
+      <h3 class="text-sm font-bold text-white">📷 Snap Note Photo</h3>
+      <button type="button" onclick="closeInAppCamera()" class="text-slate-300 hover:text-white text-2xl px-2">&times;</button>
+    </div>
+    <div class="flex-1 flex items-center justify-center overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 my-2">
+      <video id="camVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+      <canvas id="camCanvas" class="hidden"></canvas>
+    </div>
+    <div class="flex justify-center items-center gap-4 pt-2 pb-4">
+      <button type="button" onclick="closeInAppCamera()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Cancel</button>
+      <button type="button" onclick="snapInAppPhoto()" class="w-16 h-16 rounded-full bg-white border-4 border-blue-500 active:scale-95 transition shadow-xl"></button>
+      <button type="button" onclick="switchCameraFacing()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">🔄 Flip</button>
     </div>
   </div>
 
@@ -1023,6 +1041,76 @@
   function removeChecklistRow(idx) { checklistItems.splice(idx, 1); renderChecklistEditor(); }
   function toggleCheckedCollapse() { checkedCollapsed = !checkedCollapsed; renderChecklistEditor(); }
   function clearAttachment() { pendingFile = null; document.getElementById('nExistingAttach').value = ''; document.getElementById('existingAttachBar').classList.add('hidden'); document.getElementById('editorPhotoPreviewWrap').classList.add('hidden'); document.getElementById('selectedFileName').classList.add('hidden'); }
+  // ==================== IN-APP CAMERA (NO APP RESTART) ====================
+  let camStream = null;
+  let camFacing = 'environment';
+
+  async function openInAppCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return alert('In-app camera is not supported on this browser. Use 🖼️ File instead.');
+    }
+    const modal = document.getElementById('cameraModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    await startCameraStream();
+  }
+
+  async function startCameraStream() {
+    stopCameraStream();
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: camFacing }, width: { ideal: 1280 } },
+        audio: false
+      });
+      document.getElementById('camVideo').srcObject = camStream;
+    } catch {
+      alert('Camera permission denied or unavailable.');
+      closeInAppCamera();
+    }
+  }
+
+  function stopCameraStream() {
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      camStream = null;
+    }
+  }
+
+  function closeInAppCamera() {
+    stopCameraStream();
+    const modal = document.getElementById('cameraModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  async function switchCameraFacing() {
+    camFacing = camFacing === 'environment' ? 'user' : 'environment';
+    await startCameraStream();
+  }
+
+  function snapInAppPhoto() {
+    const video = document.getElementById('camVideo');
+    const canvas = document.getElementById('camCanvas');
+    if (!video.videoWidth) return;
+
+    const maxW = 1280;
+    const scale = Math.min(1, maxW / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    pendingFile = {
+      base64: dataUrl.split(',')[1],
+      name: `NotePhoto_${Date.now()}.jpg`,
+      mime: 'image/jpeg'
+    };
+
+    document.getElementById('editorPhotoPreview').src = dataUrl;
+    document.getElementById('editorPhotoPreviewWrap').classList.remove('hidden');
+    document.getElementById('existingAttachBar').classList.add('hidden');
+    closeInAppCamera();
+  }
   function previewSelectedFile(e) {
     const file = e.target.files[0]; if (!file) return;
     if (file.size > 4 * 1024 * 1024) { alert('Max file size is 4 MB.'); e.target.value = ''; return; }
